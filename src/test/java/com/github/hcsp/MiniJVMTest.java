@@ -16,20 +16,20 @@ public class MiniJVMTest {
     @CaptureSystemOutput
     public void simpleClassTest(CaptureSystemOutput.OutputCapture capture) {
         capture.expect(Matchers.containsString("42"));
-        new MiniJVM(classPath, "com.github.hcsp.SimpleClass").start();
+        new MiniJVM(classPath, "com.github.hcsp.SimpleClass").start(null);
     }
 
     @Test
     @CaptureSystemOutput
     public void branchTest(CaptureSystemOutput.OutputCapture capture) {
         capture.expect(Matchers.containsString("200"));
-        new MiniJVM(classPath, "com.github.hcsp.BranchClass").start();
+        new MiniJVM(classPath, "com.github.hcsp.BranchClass").start(null);
     }
 
     @Test
     @CaptureSystemOutput
     public void recursionTest(CaptureSystemOutput.OutputCapture capture) {
         capture.expect(Matchers.containsString("120"));
-        new MiniJVM(classPath, "com.github.hcsp.RecursiveClass").start();
+        new MiniJVM(classPath, "com.github.hcsp.RecursiveClass").start(null);
     }
 }

@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Stack;
+import java.util.function.BinaryOperator;
 
 /**
  * 这是一个用来学习的JVM
@@ -27,7 +28,7 @@ public class MiniJVM {
     private String[] classPathEntries;
 
     public static void main(String[] args) {
-        new MiniJVM("target/classes", "com.github.hcsp.RecursiveClass").start();
+        new MiniJVM("target/classes", "com.github.hcsp.RecursiveClass").start(args);
     }
 
     /**
@@ -43,16 +44,24 @@ public class MiniJVM {
     /**
      * 启动运行虚拟机
      */
-    public void start() {
+    public void start(String[] args) {
+        //加载主类的ClassFile
         ClassFile mainClassFile = loadClassFromClassPath(mainClass);
+        //获取主类的main方法入口
         MethodInfo methodInfo = mainClassFile.getMethod("main").get(0);
+        //创建线程方法栈
         Stack<StackFrame> methodStack = new Stack<>();
-        Object[] localVariablesForMainStackFrame = new Object[methodInfo.getMaxStack()];
-        localVariablesForMainStackFrame[0] = null;
+        //创建局部变量表
+        Object[] localVariablesForMainStackFrame = new Object[methodInfo.getMaxLocals()];
+        localVariablesForMainStackFrame[0] = args;
+        //创建main方法的栈帧
         StackFrame mainStackFrame = new StackFrame(localVariablesForMainStackFrame, methodInfo);
         methodStack.push(mainStackFrame);
+        //创建pc计数器
         PCRegister pcRegister = new PCRegister(methodStack);
+        //主类的常量池
         ConstantPool constantPool = mainClassFile.getConstantPool();
+        //从主类main方法开始解析ClassFile的methodInfo中一行一行的指令(instruction)
         while (true) {
             Instruction instruction = pcRegister.getNextInstruction();
             if (instruction == null) {
@@ -60,17 +69,15 @@ public class MiniJVM {
             }
             switch (instruction.getOpcode()) {
                 case imul:{
-                    Integer object1 = (int) pcRegister.getTopStackFrame().popFromOperandStack();
-                    Integer object2 = (int) pcRegister.getTopStackFrame().popFromOperandStack();
-                    Integer object = object2 * object1;
-                    pcRegister.getTopStackFrame().pushObjectToOperandStack(object);
+                    calculate(pcRegister, (a, b) -> a * b);
                 }
                 break;
                 case isub:{
-                    Integer object1 = (int) pcRegister.getTopStackFrame().popFromOperandStack();
-                    Integer object2 = (int) pcRegister.getTopStackFrame().popFromOperandStack();
-                    Integer object = object2 - object1;
-                    pcRegister.getTopStackFrame().pushObjectToOperandStack(object);
+                    calculate(pcRegister, (a, b) -> a - b);
+                }
+                break;
+                case irem: {
+                    calculate(pcRegister, (a, b) -> a % b);
                 }
                 break;
                 case sipush: {
@@ -83,13 +90,6 @@ public class MiniJVM {
                     if (object != 0) {
                         pcRegister.getTopStackFrame().jumpToAimInstruction(instruction);
                     }
-                }
-                break;
-                case irem: {
-                    Integer object1 = (int) pcRegister.getTopStackFrame().popFromOperandStack();
-                    Integer object2 = (int) pcRegister.getTopStackFrame().popFromOperandStack();
-                    Integer object = object2 % object1;
-                    pcRegister.getTopStackFrame().pushObjectToOperandStack(object);
                 }
                 break;
                 case iconst_1: {
@@ -114,6 +114,18 @@ public class MiniJVM {
                 break;
                 case iload_0: {
                     Object value = pcRegister.getTopStackFrame().getLocalVariables()[0];
+                    pcRegister.getTopStackFrame().pushObjectToOperandStack(value);
+                }
+                case iload_1: {
+                    Object value = pcRegister.getTopStackFrame().getLocalVariables()[1];
+                    pcRegister.getTopStackFrame().pushObjectToOperandStack(value);
+                }
+                case iload_2: {
+                    Object value = pcRegister.getTopStackFrame().getLocalVariables()[2];
+                    pcRegister.getTopStackFrame().pushObjectToOperandStack(value);
+                }
+                case iload_3: {
+                    Object value = pcRegister.getTopStackFrame().getLocalVariables()[3];
                     pcRegister.getTopStackFrame().pushObjectToOperandStack(value);
                 }
                 break;
@@ -146,7 +158,9 @@ public class MiniJVM {
                 }
                 break;
                 case ireturn: {
+                    //操作数栈中弹出数据
                     Object returnVal = pcRegister.getTopStackFrame().popFromOperandStack();
+                    //弹出方法栈
                     pcRegister.popFrameFromMethodStack();
                     pcRegister.getTopStackFrame().pushObjectToOperandStack(returnVal);
                 }
@@ -172,6 +186,12 @@ public class MiniJVM {
                     throw new IllegalStateException("Opcode " + instruction.getOpcode() + " not implemented yet!");
             }
         }
+    }
+
+    private void calculate(PCRegister pcRegister, BinaryOperator<Integer> operator) {
+        Integer a = (int) pcRegister.getTopStackFrame().popFromOperandStack();
+        Integer b = (int) pcRegister.getTopStackFrame().popFromOperandStack();
+        pcRegister.getTopStackFrame().pushObjectToOperandStack(operator.apply(a, b));
     }
 
     private Object[] getLocalVariables(PCRegister pcRegister, MethodInfo targetMethodInfo) {
@@ -278,6 +298,7 @@ public class MiniJVM {
             return localVariables;
         }
 
+        //跳转到目标字节码指令目标行
         public void jumpToAimInstruction(Instruction instruction) {
             List<Instruction> instructions = methodInfo.getCode();
             String[] descArr = instruction.getDesc().split(" ");
